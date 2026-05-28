@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>宝石消消乐</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-from: #1a1a2e;
+  --bg-to: #16213e;
+  --cell-size: 64px;
+  --board-padding: 4px;
+  --gem-gap: 4px;
+  color-scheme: dark;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: linear-gradient(135deg, var(--bg-from), var(--bg-to));
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#app {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ===== Level Select Screen ===== */
+#level-screen {
+  width: 100%;
+  padding: 40px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.level-title {
+  font-size: 36px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #00d4ff, #a55eea, #ff6b9d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4px;
+}
+
+.level-subtitle {
+  color: rgba(255,255,255,0.4);
+  font-size: 14px;
+  margin-bottom: 36px;
+}
+
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+.level-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.level-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+}
+
+.level-card:nth-child(1)::before { background: linear-gradient(90deg, #00d4ff, #16213e); }
+.level-card:nth-child(2)::before { background: linear-gradient(90deg, #533483, #0f3460); }
+.level-card:nth-child(3)::before { background: linear-gradient(90deg, #11998e, #2d1b69); }
+.level-card:nth-child(4)::before { background: linear-gradient(90deg, #1a5276, #4a0e0e); }
+.level-card:nth-child(5)::before { background: linear-gradient(90deg, #614385, #0c0c1d); }
+.level-card:nth-child(6)::before { background: linear-gradient(90deg, #243b55, #141e30); }
+
+.level-card:hover, .level-card:active {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.level-card-num {
+  font-size: 28px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.15);
+  position: absolute;
+  top: 10px;
+  right: 14px;
+}
+
+.level-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.level-card-info {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 10px;
+}
+
+.level-card-stars {
+  display: flex;
+  gap: 4px;
+  font-size: 18px;
+}
+
+.level-card-stars .star {
+  opacity: 0.2;
+  transition: opacity 0.3s;
+}
+
+.level-card-stars .star.earned {
+  opacity: 1;
+}
+
+/* ===== Game Screen ===== */
+#game-screen {
+  width: 100%;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 16px 20px;
+}
+
+#game-screen.active {
+  display: flex;
+}
+
+.game-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.btn-back {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.btn-back:hover { background: rgba(255,255,255,0.12); }
+
+.game-level-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* ===== HUD ===== */
+.hud {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.hud-score-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.hud-score-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.hud-stars {
+  display: flex;
+  gap: 3px;
+  font-size: 16px;
+}
+
+.hud-stars .star {
+  opacity: 0.2;
+  transition: opacity 0.4s, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.hud-stars .star.earned {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.hud-score-text {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-score-target {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 500;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00d4ff, #a55eea);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+
+.hud-moves {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 60px;
+}
+
+.hud-moves-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.hud-moves-num {
+  font-size: 28px;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.3s;
+}
+
+.hud-moves.low .hud-moves-num {
+  color: #ff4757;
+  animation: pulse 0.6s ease-in-out infinite;
+}
+
+/* ===== Combo Display ===== */
+.combo-display {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  font-size: 36px;
+  font-weight: 900;
+  color: #ffa502;
+  text-shadow: 0 0 30px rgba(255,165,2,0.6), 0 0 60px rgba(255,165,2,0.3);
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.combo-display.show {
+  animation: comboPop 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* ===== Board ===== */
+#board-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.3);
+  border: 2px solid rgba(255,255,255,0.08);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#board-container.shake {
+  animation: screenShake 0.35s ease;
+}
+
+#board {
+  position: relative;
+}
+
+.gem {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--gem-color) 12%, transparent);
+  border: 2px solid color-mix(in srgb, var(--gem-color) 25%, transparent);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+  transition: top 0.2s cubic-bezier(0.2, 0.8, 0.3, 1),
+              left 0.2s cubic-bezier(0.2, 0.8, 0.3, 1),
+              transform 0.15s ease,
+              box-shadow 0.15s ease;
+  z-index: 1;
+}
+
+.gem.dropping {
+  transition: top 0.28s cubic-bezier(0.3, 0.9, 0.4, 1),
+              left 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.gem.spawning {
+  transition: top 0.35s cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.gem.pressed {
+  transform: scale(0.92);
+  transition: transform 0.1s ease;
+}
+
+.gem.selected {
+  transform: scale(1.08);
+  z-index: 5;
+  border-color: color-mix(in srgb, var(--gem-color) 70%, transparent);
+  box-shadow: 0 0 16px var(--gem-glow), 0 0 32px color-mix(in srgb, var(--gem-glow) 40%, transparent), 0 3px 8px rgba(0,0,0,0.3);
+}
+
+.gem.removing {
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.gem-symbol {
+  font-size: calc(var(--cell-size) * 0.42);
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+}
+
+/* ===== Game Over Modal ===== */
+#game-over-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+#game-over-overlay.active {
+  display: flex;
+}
+
+#game-over-card {
+  background: rgba(30,30,50,0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 32px 28px;
+  text-align: center;
+  max-width: 340px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  animation: modalEnter 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.game-over-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.game-over-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.game-over-stars {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  font-size: 36px;
+  margin-bottom: 16px;
+}
+
+.game-over-star {
+  opacity: 0;
+  transform: scale(0) rotate(-30deg);
+}
+
+.game-over-star.animate {
+  animation: starFill 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.game-over-score {
+  font-size: 32px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.game-over-record {
+  font-size: 14px;
+  color: #ffa502;
+  margin-bottom: 20px;
+  opacity: 0;
+}
+
+.game-over-record.show {
+  animation: comboPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.game-over-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn {
+  padding: 14px 28px;
+  border-radius: 14px;
+  border: none;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.btn:active { transform: scale(0.96); }
+
+.btn-primary {
+  background: linear-gradient(135deg, #00d4ff, #a55eea);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(0,212,255,0.3);
+}
+
+.btn-primary:hover { box-shadow: 0 6px 24px rgba(0,212,255,0.5); }
+
+.btn-secondary {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.btn-secondary:hover { background: rgba(255,255,255,0.14); }
+
+.btn-outline {
+  background: transparent;
+  color: rgba(255,255,255,0.6);
+  font-size: 14px;
+}
+
+.btn-outline:hover { color: #fff; }
+
+/* ===== Particles ===== */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 20;
+  animation: particleFly 0.7s ease-out forwards;
+}
+
+.star-particle {
+  width: 14px; height: 14px;
+  background: #ffd700;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.score-popup {
+  position: absolute;
+  pointer-events: none;
+  z-index: 25;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+  white-space: nowrap;
+  animation: scorePopup 1s ease-out forwards;
+}
+
+.score-popup.combo {
+  color: #ffa502;
+  font-size: 24px;
+  text-shadow: 0 0 16px rgba(255,165,2,0.6);
+}
+
+/* ===== Keyframes ===== */
+@keyframes particleFly {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.1); opacity: 0; }
+}
+
+@keyframes scorePopup {
+  0%   { transform: translateY(0) scale(0.5); opacity: 0; }
+  20%  { transform: translateY(-15px) scale(1.15); opacity: 1; }
+  100% { transform: translateY(-70px) scale(0.9); opacity: 0; }
+}
+
+@keyframes comboPop {
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  40%  { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  60%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.1); opacity: 0; }
+}
+
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  15%  { transform: translateX(-5px) rotate(-0.5deg); }
+  30%  { transform: translateX(5px) rotate(0.5deg); }
+  45%  { transform: translateX(-4px); }
+  60%  { transform: translateX(4px); }
+  75%  { transform: translateX(-2px); }
+  90%  { transform: translateX(2px); }
+}
+
+@keyframes starFill {
+  0%   { opacity: 0; transform: scale(0) rotate(-30deg); }
+  60%  { opacity: 1; transform: scale(1.2) rotate(5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@keyframes modalEnter {
+  0%   { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 380px) {
+  .level-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .level-card { padding: 14px 12px; }
+  .level-title { font-size: 28px; }
+  .hud { gap: 10px; padding: 8px 10px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Level Select Screen -->
+  <div id="level-screen">
+    <div class="level-title">宝石消消乐</div>
+    <div class="level-subtitle">交换相邻宝石，三个连线即可消除</div>
+    <div class="level-grid" id="level-grid"></div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="game-screen">
+    <div class="game-header">
+      <button class="btn-back" id="btn-back" title="返回选关">←</button>
+      <span class="game-level-name" id="game-level-name"></span>
+      <div style="width:40px"></div>
+    </div>
+    <div class="hud">
+      <div class="hud-score-section">
+        <div class="hud-score-top">
+          <div class="hud-stars" id="hud-stars">
+            <span class="star">⭐</span>
+            <span class="star">⭐</span>
+            <span class="star">⭐</span>
+          </div>
+          <span class="hud-score-text" id="hud-score">0</span>
+          <span class="hud-score-target" id="hud-target"></span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+      <div class="hud-moves" id="hud-moves">
+        <span class="hud-moves-label">剩余步数</span>
+        <span class="hud-moves-num" id="hud-moves-num">0</span>
+      </div>
+    </div>
+
+    <div id="board-container">
+      <div id="board"></div>
+    </div>
+
+    <div class="combo-display" id="combo-display"></div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div id="game-over-overlay">
+    <div id="game-over-card">
+      <div class="game-over-icon" id="go-icon"></div>
+      <div class="game-over-title" id="go-title"></div>
+      <div class="game-over-stars" id="go-stars">
+        <span class="game-over-star">⭐</span>
+        <span class="game-over-star">⭐</span>
+        <span class="game-over-star">⭐</span>
+      </div>
+      <div class="game-over-score" id="go-score"></div>
+      <div class="game-over-record" id="go-record">🏆 新纪录!</div>
+      <div class="game-over-buttons" id="go-buttons"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/levels.js"></script>
+<script src="js/particles.js"></script>
+<script src="js/game.js"></script>
+<script>
+class GameRenderer {
+  constructor() {
+    this.engine = new Match3Engine();
+    this.particles = null;
+    this.currentLevel = null;
+    this.selectedGem = null;
+    this.gems = {};
+    this.comboTimer = null;
+    this._swapHandled = false;
+
+    this.el = {
+      levelScreen: document.getElementById('level-screen'),
+      levelGrid: document.getElementById('level-grid'),
+      gameScreen: document.getElementById('game-screen'),
+      gameLevelName: document.getElementById('game-level-name'),
+      hudScore: document.getElementById('hud-score'),
+      hudTarget: document.getElementById('hud-target'),
+      hudStars: document.getElementById('hud-stars'),
+      hudMoves: document.getElementById('hud-moves'),
+      hudMovesNum: document.getElementById('hud-moves-num'),
+      progressFill: document.getElementById('progress-fill'),
+      boardContainer: document.getElementById('board-container'),
+      board: document.getElementById('board'),
+      comboDisplay: document.getElementById('combo-display'),
+      overlay: document.getElementById('game-over-overlay'),
+      goIcon: document.getElementById('go-icon'),
+      goTitle: document.getElementById('go-title'),
+      goStars: document.getElementById('go-stars'),
+      goScore: document.getElementById('go-score'),
+      goRecord: document.getElementById('go-record'),
+      goButtons: document.getElementById('go-buttons'),
+    };
+
+    this._bindEngine();
+    this._wireInput();
+    this._renderLevelSelect();
+  }
+
+  /* ===== Level Select ===== */
+  _renderLevelSelect() {
+    const progress = this._loadProgress();
+    this.el.levelGrid.innerHTML = '';
+    LEVELS.forEach((level, i) => {
+      const card = document.createElement('div');
+      card.className = 'level-card';
+      const p = progress[level.id];
+      const starsHtml = [0,1,2].map(s =>
+        `<span class="star${p && p.stars > s ? ' earned' : ''}">⭐</span>`
+      ).join('');
+      card.innerHTML = `
+        <div class="level-card-num">${level.id}</div>
+        <div class="level-card-name">${level.name}</div>
+        <div class="level-card-info">
+          <span>🎯 ${level.targetScore}</span>
+          <span>🔄 ${level.maxMoves}步</span>
+        </div>
+        <div class="level-card-stars">${starsHtml}</div>
+      `;
+      card.addEventListener('click', () => this.startLevel(level));
+      this.el.levelGrid.appendChild(card);
+    });
+  }
+
+  /* ===== Start Level ===== */
+  startLevel(level) {
+    this.currentLevel = level;
+    document.body.style.setProperty('--bg-from', level.bgGradient[0]);
+    document.body.style.setProperty('--bg-to', level.bgGradient[1]);
+
+    this.engine.init(level);
+    this.selectedGem = null;
+    this.gems = {};
+    this.particles = new ParticleSystem(this.el.boardContainer);
+
+    this.el.levelScreen.style.display = 'none';
+    this.el.gameScreen.classList.add('active');
+    this.el.gameLevelName.textContent = level.name;
+    this.el.hudTarget.textContent = `/ ${level.targetScore}`;
+    this.el.hudScore.textContent = '0';
+    this.el.hudMovesNum.textContent = level.maxMoves;
+    this.el.hudMoves.classList.remove('low');
+    this.el.progressFill.style.width = '0%';
+    this.el.board.innerHTML = '';
+    this._updateStars(0);
+
+    this._calculateCellSize();
+    this._renderBoard();
+  }
+
+  _goBackToLevels() {
+    this.el.gameScreen.classList.remove('active');
+    this.el.levelScreen.style.display = '';
+    this.el.overlay.classList.remove('active');
+    this._renderLevelSelect();
+  }
+
+  /* ===== Board Rendering ===== */
+  _calculateCellSize() {
+    const level = this.currentLevel;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const maxBoardW = Math.min(vw - 32, 440);
+    const availH = vh - 260;
+    const cellW = Math.floor((maxBoardW - 8) / level.cols);
+    const cellH = Math.floor((availH - 8) / level.rows);
+    const cellSize = Math.min(cellW, cellH, 72);
+    document.body.style.setProperty('--cell-size', cellSize + 'px');
+
+    const gap = 4;
+    const boardW = cellSize * level.cols + gap * (level.cols - 1) + 12;
+    const boardH = cellSize * level.rows + gap * (level.rows - 1) + 12;
+    this.el.board.style.width = boardW + 'px';
+    this.el.board.style.height = boardH + 'px';
+
+    this.cellSize = cellSize;
+    this.gap = gap;
+    this.padding = 6;
+  }
+
+  _gemPos(r, c) {
+    return {
+      top: this.padding + r * (this.cellSize + this.gap),
+      left: this.padding + c * (this.cellSize + this.gap),
+    };
+  }
+
+  _gemKey(r, c) { return r + ',' + c; }
+
+  _renderBoard() {
+    for (let r = 0; r < this.engine.rows; r++) {
+      for (let c = 0; c < this.engine.cols; c++) {
+        this._createGemEl(r, c, this.engine.board[r][c]);
+      }
+    }
+  }
+
+  _createGemEl(r, c, type) {
+    const config = GEM_CONFIGS[type];
+    const { top, left } = this._gemPos(r, c);
+    const el = document.createElement('div');
+    el.className = 'gem';
+    el.dataset.row = r;
+    el.dataset.col = c;
+    el.style.cssText = `
+      top: ${top}px; left: ${left}px;
+      width: ${this.cellSize}px; height: ${this.cellSize}px;
+      --gem-color: ${config.color}; --gem-glow: ${config.glow};
+    `;
+    el.innerHTML = `<span class="gem-symbol">${config.symbol}</span>`;
+    this.el.board.appendChild(el);
+    this.gems[this._gemKey(r, c)] = el;
+    return el;
+  }
+
+  /* ===== Engine Callbacks ===== */
+  _bindEngine() {
+    this.engine.onGemMove = (fromR, fromC, toR, toC) => this._handleGemMove(fromR, fromC, toR, toC);
+    this.engine.onGemRemove = (matches, combo) => this._handleGemRemove(matches, combo);
+    this.engine.onGemCreate = (r, c, type, fromR) => this._handleGemCreate(r, c, type, fromR);
+    this.engine.onScoreUpdate = (score, matchScore, combo) => this._handleScoreUpdate(score, matchScore, combo);
+    this.engine.onMovesUpdate = (moves, max) => this._handleMovesUpdate(moves, max);
+    this.engine.onCombo = (combo) => this._handleCombo(combo);
+    this.engine.onGameOver = (won) => this._handleGameOver(won);
+  }
+
+  _handleGemMove(fromR, fromC, toR, toC) {
+    // If a swap was just handled, skip the counterpart call
+    if (this._swapHandled) {
+      this._swapHandled = false;
+      return Promise.resolve();
+    }
+
+    const fromKey = this._gemKey(fromR, fromC);
+    const toKey = this._gemKey(toR, toC);
+    const el = this.gems[fromKey];
+    if (!el) return Promise.resolve();
+
+    const other = this.gems[toKey];
+
+    // This is a two-gem swap: handle both elements at once
+    if (other && other !== el) {
+      this._swapHandled = true;
+
+      // Swap in map
+      this.gems[fromKey] = other;
+      this.gems[toKey] = el;
+
+      el.dataset.row = toR;
+      el.dataset.col = toC;
+      other.dataset.row = fromR;
+      other.dataset.col = fromC;
+
+      el.classList.add('dropping');
+      other.classList.add('dropping');
+
+      const posA = this._gemPos(toR, toC);
+      el.style.top = posA.top + 'px';
+      el.style.left = posA.left + 'px';
+
+      const posB = this._gemPos(fromR, fromC);
+      other.style.top = posB.top + 'px';
+      other.style.left = posB.left + 'px';
+
+      return Promise.all([
+        this._waitTransition(el, 500, () => el.classList.remove('dropping')),
+        this._waitTransition(other, 500, () => other.classList.remove('dropping'))
+      ]);
+    }
+
+    // Regular one-way move (drop after match removal)
+    delete this.gems[fromKey];
+    this.gems[toKey] = el;
+    el.dataset.row = toR;
+    el.dataset.col = toC;
+
+    el.classList.add('dropping');
+    const { top, left } = this._gemPos(toR, toC);
+    el.style.top = top + 'px';
+    el.style.left = left + 'px';
+
+    return this._waitTransition(el, 500, () => el.classList.remove('dropping'));
+  }
+
+  _handleGemRemove(matches, combo) {
+    const promises = [];
+    const first = matches[0];
+    for (const {r, c} of matches) {
+      const key = this._gemKey(r, c);
+      const el = this.gems[key];
+      if (!el) continue;
+      const config = GEM_CONFIGS[this.engine.board[r][c]] || GEM_CONFIGS[0];
+      const rect = el.getBoundingClientRect();
+      const boardRect = this.el.boardContainer.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2 - boardRect.left;
+      const cy = rect.top + rect.height / 2 - boardRect.top;
+
+      this.particles.emit(cx, cy, config.glow, 10);
+      if (r === first.r && c === first.c) {
+        const score = matches.length * 10 * combo;
+        this.particles.emitScorePopup(cx, cy - 10, score, combo);
+      }
+
+      el.classList.add('removing');
+      promises.push(this._waitTransition(el, 400));
+      delete this.gems[key];
+      el.addEventListener('transitionend', () => { if (el.parentNode) el.remove(); }, { once: true });
+    }
+
+    if (combo >= 3) {
+      this.el.boardContainer.classList.add('shake');
+      setTimeout(() => this.el.boardContainer.classList.remove('shake'), 350);
+    }
+
+    return Promise.all(promises);
+  }
+
+  _handleGemCreate(r, c, type, fromR) {
+    const config = GEM_CONFIGS[type];
+    const el = document.createElement('div');
+    el.className = 'gem spawning';
+    el.dataset.row = r;
+    el.dataset.col = c;
+
+    const { top: finalTop, left } = this._gemPos(r, c);
+    const startTop = finalTop - (r - fromR) * (this.cellSize + this.gap);
+    el.style.cssText = `
+      top: ${startTop}px; left: ${left}px;
+      width: ${this.cellSize}px; height: ${this.cellSize}px;
+      --gem-color: ${config.color}; --gem-glow: ${config.glow};
+    `;
+    el.innerHTML = `<span class="gem-symbol">${config.symbol}</span>`;
+    this.el.board.appendChild(el);
+    this.gems[this._gemKey(r, c)] = el;
+
+    requestAnimationFrame(() => {
+      el.style.top = finalTop + 'px';
+    });
+
+    return this._waitTransition(el, 500, () => el.classList.remove('spawning'));
+  }
+
+  _handleScoreUpdate(score, matchScore, combo) {
+    this.el.hudScore.textContent = score;
+    const pct = Math.min((score / this.currentLevel.targetScore) * 100, 100);
+    this.el.progressFill.style.width = pct + '%';
+    this._updateStars(score);
+  }
+
+  _handleMovesUpdate(moves, max) {
+    const remaining = max - moves;
+    this.el.hudMovesNum.textContent = remaining;
+    if (remaining <= 5) {
+      this.el.hudMoves.classList.add('low');
+    } else {
+      this.el.hudMoves.classList.remove('low');
+    }
+  }
+
+  _handleCombo(combo) {
+    const display = this.el.comboDisplay;
+    display.textContent = `x${combo} COMBO!`;
+    display.classList.remove('show');
+    void display.offsetWidth;
+    display.classList.add('show');
+
+    const boardRect = this.el.boardContainer.getBoundingClientRect();
+    const cx = boardRect.width / 2;
+    const cy = boardRect.height / 2;
+    const color = GEM_CONFIGS[combo % GEM_CONFIGS.length].glow;
+    this.particles.emitCombo(cx, cy, color, combo);
+  }
+
+  _handleGameOver(won) {
+    const level = this.currentLevel;
+    const score = this.engine.score;
+    const progress = this._loadProgress();
+    const prev = progress[level.id];
+
+    const isNewRecord = !prev || score > prev.bestScore;
+    const earnedStars = level.starScores.filter(s => score >= s).length;
+    const bestStars = Math.max(earnedStars, prev ? prev.stars : 0);
+
+    if (isNewRecord) {
+      progress[level.id] = {
+        bestScore: score,
+        stars: earnedStars,
+        completed: won || (prev && prev.completed),
+      };
+    } else if (prev) {
+      progress[level.id] = {
+        ...prev,
+        stars: Math.max(prev.stars, earnedStars),
+        completed: prev.completed || won,
+      };
+    } else {
+      progress[level.id] = {
+        bestScore: score,
+        stars: earnedStars,
+        completed: won,
+      };
+    }
+    this._saveProgress(progress);
+
+    // Setup modal
+    this.el.goIcon.textContent = won ? '🎉' : '😔';
+    this.el.goTitle.textContent = won ? '关卡通过!' : '挑战失败';
+    this.el.goScore.textContent = score + ' / ' + level.targetScore;
+    this.el.goRecord.classList.remove('show');
+    if (isNewRecord && score > 0) {
+      setTimeout(() => this.el.goRecord.classList.add('show'), 600);
+    }
+
+    // Stars
+    const starEls = this.el.goStars.querySelectorAll('.game-over-star');
+    starEls.forEach((s, i) => {
+      s.classList.remove('animate');
+      s.textContent = i < earnedStars ? '⭐' : '☆';
+      s.style.opacity = '0';
+      s.style.transform = 'scale(0) rotate(-30deg)';
+    });
+
+    // Buttons
+    let buttonsHtml = `<button class="btn btn-primary" id="btn-retry">重新挑战</button>`;
+    if (won && level.id < LEVELS.length) {
+      buttonsHtml += `<button class="btn btn-secondary" id="btn-next">下一关 ▶</button>`;
+    }
+    buttonsHtml += `<button class="btn btn-outline" id="btn-to-levels">返回选关</button>`;
+    this.el.goButtons.innerHTML = buttonsHtml;
+
+    this.el.overlay.classList.add('active');
+
+    // Animate stars
+    starEls.forEach((s, i) => {
+      setTimeout(() => {
+        s.classList.add('animate');
+      }, 200 + i * 250);
+    });
+
+    // Wire buttons
+    document.getElementById('btn-retry').onclick = () => {
+      this.el.overlay.classList.remove('active');
+      this.startLevel(level);
+    };
+    const btnNext = document.getElementById('btn-next');
+    if (btnNext) {
+      btnNext.onclick = () => {
+        this.el.overlay.classList.remove('active');
+        this.startLevel(LEVELS[level.id]);
+      };
+    }
+    document.getElementById('btn-to-levels').onclick = () => this._goBackToLevels();
+  }
+
+  /* ===== HUD Helpers ===== */
+  _updateStars(score) {
+    const stars = this.el.hudStars.querySelectorAll('.star');
+    const earned = this.currentLevel.starScores.filter(s => score >= s).length;
+    stars.forEach((s, i) => s.classList.toggle('earned', i < earned));
+  }
+
+  /* ===== Input Handling ===== */
+  _wireInput() {
+    const board = this.el.board;
+    let pointerStart = null;
+    let pointerSwiped = false;
+
+    board.addEventListener('pointerdown', (e) => {
+      if (this.engine.isAnimating) return;
+      const gem = e.target.closest('.gem');
+      if (!gem) return;
+      e.preventDefault();
+      pointerStart = {
+        x: e.clientX,
+        y: e.clientY,
+        r: parseInt(gem.dataset.row),
+        c: parseInt(gem.dataset.col),
+        gem: gem,
+      };
+      pointerSwiped = false;
+      gem.classList.add('pressed');
+    });
+
+    board.addEventListener('pointermove', (e) => {
+      if (!pointerStart || pointerSwiped || this.engine.isAnimating) return;
+      const dx = e.clientX - pointerStart.x;
+      const dy = e.clientY - pointerStart.y;
+      const threshold = 15;
+      if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+
+      pointerSwiped = true;
+      let dir;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        dir = dx > 0 ? 'right' : 'left';
+      } else {
+        dir = dy > 0 ? 'down' : 'up';
+      }
+      this._swipe(pointerStart.r, pointerStart.c, dir);
+      pointerStart = null;
+    });
+
+    board.addEventListener('pointerup', () => {
+      if (pointerStart && pointerStart.gem) {
+        pointerStart.gem.classList.remove('pressed');
+      }
+      if (!pointerSwiped && pointerStart) {
+        this._onGemTap(pointerStart.r, pointerStart.c);
+      }
+      pointerStart = null;
+    });
+
+    board.addEventListener('pointercancel', () => {
+      if (pointerStart && pointerStart.gem) {
+        pointerStart.gem.classList.remove('pressed');
+      }
+      pointerStart = null;
+    });
+
+    // Back button
+    document.getElementById('btn-back').addEventListener('click', () => this._goBackToLevels());
+
+    // Resize
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (!this.currentLevel) return;
+        this._calculateCellSize();
+        for (const [key, el] of Object.entries(this.gems)) {
+          const [r, c] = key.split(',').map(Number);
+          const { top, left } = this._gemPos(r, c);
+          el.style.transition = 'none';
+          el.style.top = top + 'px';
+          el.style.left = left + 'px';
+          el.style.width = this.cellSize + 'px';
+          el.style.height = this.cellSize + 'px';
+          requestAnimationFrame(() => { el.style.transition = ''; });
+        }
+      }, 200);
+    });
+  }
+
+  _onGemTap(r, c) {
+    if (this.selectedGem) {
+      const sr = this.selectedGem.r;
+      const sc = this.selectedGem.c;
+      if (sr === r && sc === c) {
+        this._deselectGem();
+        return;
+      }
+      if (this.engine.isAdjacent(sr, sc, r, c)) {
+        this._deselectGem();
+        this.engine.trySwap(sr, sc, r, c);
+        return;
+      }
+      this._deselectGem();
+      this._selectGem(r, c);
+    } else {
+      this._selectGem(r, c);
+    }
+  }
+
+  _swipe(r, c, direction) {
+    this._deselectGem();
+    const map = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+    const [dr, dc] = map[direction];
+    const nr = r + dr;
+    const nc = c + dc;
+    if (nr < 0 || nr >= this.engine.rows || nc < 0 || nc >= this.engine.cols) return;
+    this.engine.trySwap(r, c, nr, nc);
+  }
+
+  _selectGem(r, c) {
+    this.selectedGem = { r, c };
+    const el = this.gems[this._gemKey(r, c)];
+    if (el) el.classList.add('selected');
+  }
+
+  _deselectGem() {
+    if (!this.selectedGem) return;
+    const el = this.gems[this._gemKey(this.selectedGem.r, this.selectedGem.c)];
+    if (el) el.classList.remove('selected');
+    this.selectedGem = null;
+  }
+
+  /* ===== Helpers ===== */
+  _waitTransition(el, timeoutMs, cleanup) {
+    return new Promise(resolve => {
+      let resolved = false;
+      const done = () => {
+        if (resolved) return;
+        resolved = true;
+        el.removeEventListener('transitionend', onEnd);
+        clearTimeout(timer);
+        if (cleanup) cleanup();
+        resolve();
+      };
+      const onEnd = (e) => {
+        if (e.propertyName === 'top' || e.propertyName === 'left' || e.propertyName === 'transform') {
+          done();
+        }
+      };
+      const timer = setTimeout(done, timeoutMs);
+      el.addEventListener('transitionend', onEnd);
+    });
+  }
+
+  _loadProgress() {
+    try {
+      return JSON.parse(localStorage.getItem('match3_progress')) || {};
+    } catch { return {}; }
+  }
+
+  _saveProgress(data) {
+    try {
+      localStorage.setItem('match3_progress', JSON.stringify(data));
+    } catch {}
+  }
+}
+
+/* ===== Bootstrap ===== */
+document.addEventListener('DOMContentLoaded', () => {
+  window.gameRenderer = new GameRenderer();
+});
+</script>
+
+</body>
+</html>
